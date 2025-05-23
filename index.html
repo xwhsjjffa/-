@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧大棚 - 物联网监控系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#22c55e', // 主色调：绿色，代表自然和生长
+                        secondary: '#f97316', // 辅助色：橙色，代表温暖和活力
+                        neutral: {
+                            100: '#f8fafc',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .glass {
+                backdrop-filter: blur(10px);
+                background-color: rgba(255, 255, 255, 0.7);
+            }
+            .card-shadow {
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+            }
+            .sensor-value {
+                @apply text-2xl font-bold text-neutral-800 transition-all duration-500;
+            }
+            .dashboard-card {
+                @apply bg-white rounded-xl p-6 card-shadow transition-all duration-300 hover:shadow-lg;
+            }
+            .animate-float {
+                animation: float 6s ease-in-out infinite;
+            }
+            @keyframes float {
+                0% { transform: translateY(0px); }
+                50% { transform: translateY(-10px); }
+                100% { transform: translateY(0px); }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-neutral-100 to-neutral-200 min-h-screen font-sans text-neutral-800">
+    <!-- 登录页面 -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center p-4">
+        <div class="relative w-full max-w-md">
+            <!-- 装饰元素 -->
+            <div class="absolute -top-16 -right-16 w-32 h-32 bg-primary/10 rounded-full animate-float"></div>
+            <div class="absolute -bottom-10 -left-10 w-24 h-24 bg-secondary/10 rounded-full animate-float" style="animation-delay: 2s;"></div>
+            
+            <div class="glass rounded-2xl p-8 relative z-10">
+                <div class="text-center mb-8">
+                    <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/20 mb-4">
+                        <i class="fa-solid fa-leaf text-primary text-3xl"></i>
+                    </div>
+                    <h1 class="text-[clamp(1.5rem,3vw,2rem)] font-bold text-neutral-800">智慧大棚监控系统</h1>
+                    <p class="text-neutral-600 mt-2">请登录以访问系统</p>
+                </div>
+                
+                <form id="login-form" class="space-y-5">
+                    <div class="space-y-2">
+                        <label for="username" class="block text-sm font-medium text-neutral-700">用户名</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                                <i class="fa-solid fa-user"></i>
+                            </span>
+                            <input type="text" id="username" name="username" value="admin" 
+                                class="w-full pl-10 pr-4 py-3 rounded-lg border border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                placeholder="请输入用户名">
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label for="password" class="block text-sm font-medium text-neutral-700">密码</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-neutral-500">
+                                <i class="fa-solid fa-lock"></i>
+                            </span>
+                            <input type="password" id="password" name="password" value="admin" 
+                                class="w-full pl-10 pr-4 py-3 rounded-lg border border-neutral-300 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                placeholder="请输入密码">
+                            <button type="button" id="toggle-password" class="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-500 hover:text-neutral-700">
+                                <i class="fa-solid fa-eye-slash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" 
+                        class="w-full py-3 px-4 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg transition-all duration-300 flex items-center justify-center gap-2 shadow-md hover:shadow-lg transform hover:-translate-y-0.5">
+                        <i class="fa-solid fa-sign-in"></i>
+                        <span>登录系统</span>
+                    </button>
+                </form>
+                
+                <div class="mt-6 text-center text-sm text-neutral-600">
+                    <p>© 2025 智慧大棚监控系统 - 物联网解决方案</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主页面（默认隐藏） -->
+    <div id="main-page" class="hidden min-h-screen flex flex-col">
+        <!-- 顶部导航栏 -->
+        <header class="bg-white shadow-sm sticky top-0 z-50">
+            <div class="container mx-auto px-4">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
+                            <i class="fa-solid fa-leaf text-primary text-2xl mr-2"></i>
+                            <span class="font-bold text-xl">智慧大棚监控系统</span>
+                        </div>
+                        <!-- 新增导航菜单 -->
+                        <div class="hidden md:flex items-center space-x-6 ml-8">
+                            <a href="#" class="nav-link text-neutral-700 hover:text-primary transition-colors" data-page="overview">概览</a>
+                            <a href="#" class="nav-link text-neutral-700 hover:text-primary transition-colors" data-page="device">设备管理</a>
+                            <a href="#" class="nav-link text-neutral-700 hover:text-primary transition-colors" data-page="history">历史数据</a>
+                            <a href="#" class="nav-link text-neutral-700 hover:text-primary transition-colors" data-page="settings">系统设置</a>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-4">
+                        <button id="logout-btn" class="flex items-center gap-2 text-neutral-700 hover:text-primary transition-colors">
+                            <i class="fa-solid fa-sign-out"></i>
+                            <span>退出登录</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- 主内容区 -->
+        <main class="flex-grow container mx-auto px-4 py-8">
+            <!-- 状态概览 -->
+            <div class="mb-8">
+                <h2 class="text-[clamp(1.25rem,2vw,1.75rem)] font-bold text-neutral-800 mb-6">大棚状态概览</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- 温度卡片 -->
+                    <div class="dashboard-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium text-neutral-700">温度</h3>
+                            <div class="flex items-center text-green-600">
+                                <i class="fa-solid fa-arrow-up mr-1"></i>
+                                <span class="text-sm">正常</span>
+                            </div>
+                        </div>
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <span id="temperature" class="sensor-value">25.5</span>
+                                <span class="text-xl text-neutral-600">°C</span>
+                            </div>
+                            <div class="w-16 h-16">
+                                <i class="fa-solid fa-thermometer-half text-primary text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-primary h-2 rounded-full" style="width: 60%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-neutral-600 mt-1">
+                                <span>0°C</span>
+                                <span>50°C</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 湿度卡片 -->
+                    <div class="dashboard-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium text-neutral-700">湿度</h3>
+                            <div class="flex items-center text-green-600">
+                                <i class="fa-solid fa-arrow-up mr-1"></i>
+                                <span class="text-sm">正常</span>
+                            </div>
+                        </div>
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <span id="humidity" class="sensor-value">68</span>
+                                <span class="text-xl text-neutral-600">%</span>
+                            </div>
+                            <div class="w-16 h-16">
+                                <i class="fa-solid fa-tint text-blue-500 text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: 68%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-neutral-600 mt-1">
+                                <span>0%</span>
+                                <span>100%</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 光照卡片 -->
+                    <div class="dashboard-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium text-neutral-700">光照</h3>
+                            <div class="flex items-center text-yellow-600">
+                                <i class="fa-solid fa-arrow-down mr-1"></i>
+                                <span class="text-sm">偏低</span>
+                            </div>
+                        </div>
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <span id="light" class="sensor-value">3200</span>
+                                <span class="text-xl text-neutral-600">lux</span>
+                            </div>
+                            <div class="w-16 h-16">
+                                <i class="fa-solid fa-sun text-yellow-500 text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 35%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-neutral-600 mt-1">
+                                <span>0 lux</span>
+                                <span>10000 lux</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- CO2卡片 -->
+                    <div class="dashboard-card">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium text-neutral-700">CO₂</h3>
+                            <div class="flex items-center text-green-600">
+                                <i class="fa-solid fa-arrow-up mr-1"></i>
+                                <span class="text-sm">正常</span>
+                            </div>
+                        </div>
+                        <div class="flex items-end justify-between">
+                            <div>
+                                <span id="co2" class="sensor-value">420</span>
+                                <span class="text-xl text-neutral-600">ppm</span>
+                            </div>
+                            <div class="w-16 h-16">
+                                <i class="fa-solid fa-cloud text-neutral-500 text-3xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-neutral-500 h-2 rounded-full" style="width: 45%"></div>
+                            </div>
+                            <div class="flex justify-between text-xs text-neutral-600 mt-1">
+                                <span>0 ppm</span>
+                                <span>1000 ppm</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 图表和控制区 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 环境趋势图表 -->
+                <div class="lg:col-span-2 dashboard-card">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="font-bold text-lg text-neutral-800">环境监测实景</h3>
+                        <div class="flex space-x-2">
+                            <button class="px-3 py-1 text-sm bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors">日</button>
+                            <button class="px-3 py-1 text-sm bg-neutral-200 text-neutral-700 rounded-full hover:bg-neutral-300 transition-colors">周</button>
+                            <button class="px-3 py-1 text-sm bg-neutral-200 text-neutral-700 rounded-full hover:bg-neutral-300 transition-colors">月</button>
+                        </div>
+                    </div>
+                    <!-- 原canvas替换为图片容器 -->
+                    <div class="h-80 rounded-lg overflow-hidden">
+                        <img src="111.jpg" alt="环境监测实景" class="w-full h-full object-cover">
+                    </div>
+                </div>
+                
+                <!-- 设备控制 -->
+                <div class="dashboard-card">
+                    <h3 class="font-bold text-lg text-neutral-800 mb-6">设备控制</h3>
+                    
+                    <div class="space-y-6">
+                        <!-- 灯光控制 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-medium text-neutral-700">智能灯光</h4>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="light-control" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-neutral-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
+                            <div class="relative pt-1">
+                                <input type="range" id="light-intensity" min="0" max="100" value="75" 
+                                    class="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                                <div class="flex justify-between text-xs text-neutral-500 mt-1">
+                                    <span>关闭</span>
+                                    <span>中等</span>
+                                    <span>最大</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 灌溉控制 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-medium text-neutral-700">灌溉系统</h4>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="irrigation-control" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-neutral-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 mt-2">
+                                <button class="py-2 px-3 bg-neutral-200 hover:bg-neutral-300 rounded-lg text-sm transition-colors">15分钟</button>
+                                <button class="py-2 px-3 bg-neutral-200 hover:bg-neutral-300 rounded-lg text-sm transition-colors">30分钟</button>
+                                <button class="py-2 px-3 bg-primary hover:bg-primary/90 rounded-lg text-sm text-white transition-colors">1小时</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 通风控制 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-medium text-neutral-700">通风系统</h4>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="ventilation-control" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-neutral-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between mt-2">
+                                <span class="text-sm text-neutral-600">风速</span>
+                                <span id="fan-speed" class="text-sm font-medium">中速</span>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2 mt-2">
+                                <button class="py-2 px-3 bg-neutral-200 hover:bg-neutral-300 rounded-lg text-sm transition-colors">低速</button>
+                                <button class="py-2 px-3 bg-primary hover:bg-primary/90 rounded-lg text-sm text-white transition-colors">中速</button>
+                                <button class="py-2 px-3 bg-neutral-200 hover:bg-neutral-300 rounded-lg text-sm transition-colors">高速</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 温度控制 -->
+                        <div>
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-medium text-neutral-700">温控系统</h4>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="temperature-control" class="sr-only peer" checked>
+                                    <div class="w-11 h-6 bg-neutral-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                </label>
+                            </div>
+                            <div class="flex items-center justify-between mt-3">
+                                <span class="text-sm text-neutral-600">目标温度</span>
+                                <div class="flex items-center gap-3">
+                                    <button class="w-8 h-8 flex items-center justify-center bg-neutral-200 hover:bg-neutral-300 rounded-full transition-colors">
+                                        <i class="fa-solid fa-minus text-sm"></i>
+                                    </button>
+                                    <span class="text-lg font-medium">25°C</span>
+                                    <button class="w-8 h-8 flex items-center justify-center bg-neutral-200 hover:bg-neutral-300 rounded-full transition-colors">
+                                        <i class="fa-solid fa-plus text-sm"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 作物生长监测 -->
+            <div class="mt-8">
+                <h2 class="text-[clamp(1.25rem,2vw,1.75rem)] font-bold text-neutral-800 mb-6">作物生长监测</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- 作物卡片1 -->
+                    <div class="dashboard-card group">
+                        <div class="relative overflow-hidden rounded-lg mb-4">
+                            <img src="https://picsum.photos/seed/tomato/600/400" alt="番茄生长情况" class="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end">
+                                <div class="p-4">
+                                    <span class="inline-block px-2 py-1 bg-green-500 text-white text-xs rounded-full mb-1">生长良好</span>
+                                    <h3 class="text-white font-medium">A区大棚</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-xs text-neutral-500">预计收获</span>
+                                <div class="flex items-center mt-1">
+                                    <i class="fa-solid fa-calendar-days text-neutral-400 mr-2"></i>
+                                    <span class="font-medium">14天后</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-xs text-neutral-500">生长阶段</span>
+                                <div class="flex items-center mt-1">
+                                    <i class="fa-solid fa-seedling text-neutral-400 mr-2"></i>
+                                    <span class="font-medium">结果期</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between text-sm mb-2">
+                                <span>生长进度</span>
+                                <span class="font-medium">85%</span>
+                            </div>
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 85%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 作物卡片2 -->
+                    <div class="dashboard-card group">
+                        <div class="relative overflow-hidden rounded-lg mb-4">
+                            <img src="https://picsum.photos/seed/lettuce/600/400" alt="生菜生长情况" class="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end">
+                                <div class="p-4">
+                                    <span class="inline-block px-2 py-1 bg-green-500 text-white text-xs rounded-full mb-1">生长良好</span>
+                                    <h3 class="text-white font-medium">温室B区</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-xs text-neutral-500">预计收获</span>
+                                <div class="flex items-center mt-1">
+                                    <i class="fa-solid fa-calendar-days text-neutral-400 mr-2"></i>
+                                    <span class="font-medium">7天后</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-xs text-neutral-500">生长阶段</span>
+                                <div class="flex items-center mt-1">
+                                    <i class="fa-solid fa-seedling text-neutral-400 mr-2"></i>
+                                    <span class="font-medium">成熟期</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between text-sm mb-2">
+                                <span>生长进度</span>
+                                <span class="font-medium">92%</span>
+                            </div>
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: 92%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 作物卡片3 -->
+                    <div class="dashboard-card group">
+                        <div class="relative overflow-hidden rounded-lg mb-4">
+                            <img src="https://picsum.photos/seed/cucumber/600/400" alt="黄瓜生长情况" class="w-full h-48 object-cover transition-transform duration-500 group-hover:scale-105">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end">
+                                <div class="p-4">
+                                    <span class="inline-block px-2 py-1 bg-yellow-500 text-white text-xs rounded-full mb-1">需要关注</span>
+                                    <h3 class="text-white font-medium">温室C区</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <span class="text-xs text-neutral-500">预计收获</span>
+                                <div class="flex items-center mt-1">
+                                    <i class="fa-solid fa-calendar-days text-neutral-400 mr-2"></i>
+                                    <span class="font-medium">21天后</span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-xs text-neutral-500">生长阶段</span>
+                                <div class="flex items-center mt-1">
+                                    <i class="fa-solid fa-seedling text-neutral-400 mr-2"></i>
+                                    <span class="font-medium">开花期</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="flex items-center justify-between text-sm mb-2">
+                                <span>生长进度</span>
+                                <span class="font-medium">65%</span>
+                            </div>
+                            <div class="w-full bg-neutral-200 rounded-full h-2">
+                                <div class="bg-yellow-500 h-2 rounded-full" style="width: 65%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 页脚 -->
+        <footer class="bg-white py-6 border-t border-neutral-200">
+            <div class="container mx-auto px-4">
+                <div class="flex flex-col md:flex-row justify-between items-center">
+                    <div class="mb-4 md:mb-0">
+                        <div class="flex items-center">
+                            <i class="fa-solid fa-leaf text-primary text-xl mr-2"></i>
+                            <span class="font-medium">智慧大棚监控系统</span>
+                        </div>
+                        <p class="text-sm text-neutral-600 mt-1">© 2025 物联网农业解决方案</p>
+                    </div>
+                    
+                    <div class="flex space-x-6">
+                       
+                        <a href="#" class="text-neutral-600 hover:text-primary transition-colors">
+                            <i class="fa-solid fa-question-circle"></i>
+                            <span class="ml-1 text-sm">帮助中心</span>
+                        </a>
+                        <a href="#" class="text-neutral-600 hover:text-primary transition-colors">
+                            <i class="fa-solid fa-book"></i>
+                            <span class="ml-1 text-sm">使用手册</span>
+                        </a>
+                        <a href="#" class="text-neutral-600 hover:text-primary transition-colors">
+                            <i class="fa-solid fa-envelope"></i>
+                            <span class="ml-1 text-sm">联系我们</span>
+                        
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // 登录逻辑
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('login-form');
+            const loginPage = document.getElementById('login-page');
+            const mainPage = document.getElementById('main-page');
+            const logoutBtn = document.getElementById('logout-btn');
+            const togglePassword = document.getElementById('toggle-password');
+            const passwordInput = document.getElementById('password');
+            
+            // 切换密码可见性
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.querySelector('i').classList.toggle('fa-eye');
+                this.querySelector('i').classList.toggle('fa-eye-slash');
+            });
+            
+            // 登录表单提交事件监听
+            loginForm.addEventListener('submit', function(e) {
+                e.preventDefault(); // 阻止表单默认提交行为（避免页面跳转）
+                
+                // 获取输入的用户名和密码
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                
+                // 模拟登录验证（硬编码验证，实际需后端接口）
+                if (username === 'admin' && password === 'admin') {
+                    // 验证通过时的处理
+                    
+                    // 获取提交按钮并保存原始内容
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalContent = submitBtn.innerHTML;
+                    
+                    // 禁用按钮并显示加载状态
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 登录中...';
+                    
+                    // 模拟API请求延迟（800ms）
+                    setTimeout(() => {
+                        loginPage.classList.add('hidden'); // 隐藏登录页面
+                        mainPage.classList.remove('hidden'); // 显示主页面
+                        
+                        // 恢复按钮状态
+                        submitBtn.innerHTML = originalContent;
+                        submitBtn.disabled = false;
+                        
+                        // 初始化主页面功能（图表和数据更新）
+                        initEnvironmentChart();
+                        startDataUpdates();
+                    }, 800);
+                } else {
+                    // 验证失败时弹出错误提示
+                    alert('用户名或密码错误');
+                }
+            });
+            
+            // 退出登录按钮点击事件监听
+            logoutBtn.addEventListener('click', function() {
+                mainPage.classList.add('hidden'); // 隐藏主页面
+                loginPage.classList.remove('hidden'); // 显示登录页面
+            });
+        });
+        
+        // 初始化环境参数图表
+        function initEnvironmentChart() {
+            const ctx = document.getElementById('environment-chart').getContext('2d');
+            
+            // 模拟数据
+            const labels = ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00'];
+            const temperatureData = [22.1, 21.5, 20.8, 23.2, 25.5, 26.8, 25.2, 23.9];
+            const humidityData = [70, 72, 75, 68, 65, 62, 67, 69];
+            const lightData = [0, 0, 2500, 5000, 8500, 7000, 4500, 0];
+            
+            // 创建图表
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '温度 (°C)',
+                            data: temperatureData,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '湿度 (%)',
+                            data: humidityData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        },
+                        {
+                            label: '光照 (lux)',
+                            data: lightData,
+                            borderColor: '#eab308',
+                            backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: {
+                                drawBorder: false
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 2000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+        
+        // 启动数据更新模拟
+        function startDataUpdates() {
+            const temperatureElement = document.getElementById('temperature');
+            const humidityElement = document.getElementById('humidity');
+            const lightElement = document.getElementById('light');
+            const co2Element = document.getElementById('co2');
+            
+            // 初始值
+            let temperature = parseFloat(temperatureElement.textContent);
+            let humidity = parseInt(humidityElement.textContent);
+            let light = parseInt(lightElement.textContent);
+            let co2 = parseInt(co2Element.textContent);
+            
+            // 定期更新数据
+            setInterval(() => {
+                // 随机变化
+                temperature += (Math.random() - 0.5) * 0.3;
+                humidity += Math.floor((Math.random() - 0.5) * 2);
+                light += Math.floor((Math.random() - 0.5) * 200);
+                co2 += Math.floor((Math.random() - 0.5) * 10);
+                
+                // 限制范围
+                temperature = Math.max(18, Math.min(30, temperature));
+                humidity = Math.max(50, Math.min(90, humidity));
+                light = Math.max(0, Math.min(10000, light));
+                co2 = Math.max(350, Math.min(800, co2));
+                
+                // 动画更新
+                animateValue(temperatureElement, parseFloat(temperatureElement.textContent), temperature, 500);
+                animateValue(humidityElement, parseInt(humidityElement.textContent), humidity, 500);
+                animateValue(lightElement, parseInt(lightElement.textContent), light, 500);
+                animateValue(co2Element, parseInt(co2Element.textContent), co2, 500);
+            }, 5000);
+        }
+        
+        // 数值动画函数
+        function animateValue(element, start, end, duration) {
+            let startTime = null;
+            
+            function animation(currentTime) {
+                if (!startTime) startTime = currentTime;
+                const timeElapsed = currentTime - startTime;
+                const progress = Math.min(timeElapsed / duration, 1);
+                
+                if (element.textContent.includes('.')) {
+                    // 小数
+                    const value = start + (end - start) * progress;
+                    element.textContent = value.toFixed(1);
+                } else {
+                    // 整数
+                    const value = Math.floor(start + (end - start) * progress);
+                    element.textContent = value;
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animation);
+                }
+            }
+            
+            requestAnimationFrame(animation);
+        }
+    </script>
+</body>
+</html>
+    
